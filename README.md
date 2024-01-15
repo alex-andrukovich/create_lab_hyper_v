@@ -1,1 +1,1 @@
-# create_lab_hyper_v
+-s hosts_file.txt -k ks_tmpl.cfg -l D:\VM_LAB\ -i D:\VM_LAB\OracleLinux-R9-U2-x86_64-dvd.iso -e D:\extracted_iso\ -n NAT
