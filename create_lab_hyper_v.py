@@ -24,7 +24,7 @@ logger = logging.getLogger("logger")
 logger.setLevel(logging.DEBUG)
 # Create handlers
 c_handler = logging.StreamHandler(stream=sys.stdout)
-f_handler = logging.FileHandler('hv_export_cfg.log')
+f_handler = logging.FileHandler('create_lab.log')
 c_handler.setLevel(logging.DEBUG)
 f_handler.setLevel(logging.DEBUG)
 # Create formatters and add it to handlers
