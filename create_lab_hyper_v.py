@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 import logging
 import optparse
-import colorama
 from colorama import Fore, Style
-import os
 import sys
 import subprocess
 import stat
-
+import shutil
+import os
 
 # PRE-REQ:
 # Run as admin
@@ -15,8 +14,8 @@ import stat
 # wsl --set-default-version 1
 # wsl --list --online
 # wsl --install -d OracleLinux_9_1
+# wsl --list --verbose
 # wsl yum install genisoimage
-
 
 # Create a custom logger
 logger = logging.getLogger("logger")
@@ -121,6 +120,7 @@ def mount_iso(isofile):
 def copy_files_from_mounted_iso(isofile_mount_drive_latter, extractediso_dir):
     # Copy the contents of the ISO to the temporary directory
     extractediso_dir = extractediso_dir.replace("\\", "\\\\")
+
     try:
         logger.info("Attempting to copy mounted ISO " + isofile_mount_drive_latter + " to " + extractediso_dir)
         copy_iso_files_to_extractediso_dir = subprocess.check_output(["PowerShell", "Copy-Item", "-Path", isofile_mount_drive_latter + "*", "-Destination", extractediso_dir, "-Recurse", "-Force"])
@@ -209,7 +209,17 @@ def build_iso(extractediso_dir, lab_label, labdirectory, servername):
     print(extractediso_dir_lnx)
     os.chdir(extractediso_dir)
     # output_of_cmd = subprocess.check_output(["dir"], shell=True)
-    build = subprocess.check_output(["wsl.exe", "genisoimage", "-U", "-r", "-v", "-T", "-J", "-joliet-long", "-V", lab_label, "-volset", lab_label, "-A", lab_label, "-b", "isolinux/isolinux.bin", "-c", "isolinux/boot.cat", "-no-emul-boot", "-boot-load-size", "4", "-boot-info-table", "-eltorito-alt-boot", "-e", "images/efiboot.img", "-no-emul-boot", "-o", outfile, extractediso_dir_lnx, "."])
+    #build = subprocess.check_output(["wsl.exe", "genisoimage", "-U", "-r", "-v", "-T", "-J", "-joliet-long", "-V", lab_label, "-volset", lab_label, "-A", lab_label, "-b", "isolinux/isolinux.bin", "-c", "isolinux/boot.cat", "-no-emul-boot", "-boot-load-size", "4", "-boot-info-table", "-eltorito-alt-boot", "-e", "images/efiboot.img", "-no-emul-boot", "-o", outfile, extractediso_dir_lnx, "."])
+    build = subprocess.check_output([
+        "wsl.exe", "genisoimage",
+        "-U", "-r", "-v", "-J", "-joliet-long",
+        "-V", lab_label, "-volset", lab_label, "-A", lab_label,
+        "-eltorito-alt-boot",
+        "-e", "images/efiboot.img",
+        "-no-emul-boot",
+        "-o", outfile,
+        extractediso_dir_lnx
+    ])
     os.chdir(script_dir)
     return build
 
@@ -226,8 +236,8 @@ replace_grub_file_with_modified(extractediso_dir, lab_modified_grub_file)
 lab_label = get_label(lab_orig_grub)
 
 for lab_server in lab_server_list:
-    vm_memory = "4GB"
-    vm_cpu = "8"
+    vm_memory = "3GB"
+    vm_cpu = "4"
     ks = create_kickstart_file(lab_kickstart_template, lab_server[0],lab_server[1], lab_server[2], lab_server[3], lab_server[4])
     # file_name = lab_server[0] + "_ks.cfg"
     file_name = "ks.cfg"
@@ -251,3 +261,6 @@ for lab_server in lab_server_list:
     cmd = f'powershell -Command "Set-VMFirmware -VMName {vm_name} -FirstBootDevice $(Get-VMDvdDrive -VMName {vm_name})"'
     setdvdboot = subprocess.run(cmd, shell=True)
     startvm = subprocess.check_output(["PowerShell", "Start-VM", "-VMName", lab_server[0]])
+
+
+
