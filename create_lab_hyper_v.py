@@ -16,6 +16,7 @@ import os
 # wsl --install -d OracleLinux_9_1
 # wsl --list --verbose
 # wsl yum install genisoimage
+# https://knowledge.broadcom.com/external/article/344595/downloading-vmware-workstation-pro.html
 
 # Create a custom logger
 logger = logging.getLogger("logger")
@@ -49,6 +50,8 @@ def get_arguments():
                       help="Enter the extracted ISO full path. e.g. D:\\extracted_iso\\ this folder will be created by the script")
     parser.add_option("-n", "--vmnet", dest="vmnet",
                       help="Enter the Hyper-V switch name, e.g. NAT")
+    parser.add_option("-v", "--hypervisor", dest="hypervisor",
+                      help="Enter the hypervisor hyperv or vmware")
     (options, arguments) = parser.parse_args()
     if not options.serverlist:
         parser.exit("[-] File name must be specified, the file must be located in same directory as the script \n The file should contain the list of hosts that will be created in the Hyper-V env. for example: \n #server_name,ip_address,subnet_mask,default_gw,dns_server \n server1,10.0.0.40,255.255.255.0,10.0.0.1,8.8.8.8")
@@ -62,6 +65,8 @@ def get_arguments():
         parser.exit("[-] Enter the extracted ISO full path. e.g. D:\\extracted_iso\\ this folder will be created by the script")
     elif not options.vmnet:
         parser.exit("[-] Enter the Hyper-V switch name, e.g. NAT")
+    elif not options.hypervisor:
+        parser.exit("[-] Enter the hypervisor hyperv or vmware")
     return options
 
 user_input = get_arguments()
@@ -71,6 +76,7 @@ labdirectory = user_input.labdirectory
 isofile = user_input.isofile
 extractediso_dir = user_input.extractediso
 vmnet = user_input.vmnet
+hypervisor = user_input.hypervisor
 
 def create_serverlist(list_of_servers_to_create):
     logger.info("\n[+] The script will create the following servers based on the file " + Fore.BLUE + list_of_servers_to_create + Style.RESET_ALL + ": ")
@@ -236,31 +242,111 @@ replace_grub_file_with_modified(extractediso_dir, lab_modified_grub_file)
 lab_label = get_label(lab_orig_grub)
 
 for lab_server in lab_server_list:
-    vm_memory = "3GB"
-    vm_cpu = "4"
-    ks = create_kickstart_file(lab_kickstart_template, lab_server[0],lab_server[1], lab_server[2], lab_server[3], lab_server[4])
-    # file_name = lab_server[0] + "_ks.cfg"
-    file_name = "ks.cfg"
-    with open(file_name, 'w', newline='\n') as f:
-        f.writelines(ks)
-    copy_ks_to_extracted_iso = subprocess.check_output(["PowerShell", "Copy-Item", " -Path", file_name, "-Destination", extractediso_dir])
-    build_iso_file = build_iso(extractediso_dir, lab_label, labdirectory, lab_server[0])
-    newvm = subprocess.check_output(["PowerShell", "New-VM", "-Name", lab_server[0], "-Generation", "2", "-SwitchName", vmnet])
-    vhdpath = labdirectory + lab_server[0] + "\\\\" + lab_server[0] + ".vhdx"
-    print(vhdpath)
-    newvhd = subprocess.check_output(["PowerShell", "New-VHD", "-Path", vhdpath, "-Dynamic", "-SizeBytes", "1024GB"])
-    addvhd = subprocess.check_output(["PowerShell", "ADD-VMHardDiskDrive", "-VMName", lab_server[0], "-Path", vhdpath])
-    staticmem = subprocess.check_output(["PowerShell", "Set-VM", "-VMName", lab_server[0], "-StaticMemory"])
-    setmem = subprocess.check_output(["PowerShell", "Set-VM", "-VMName", lab_server[0], "-MemoryStartupBytes", vm_memory])
-    setfw = subprocess.check_output(["PowerShell", "Set-VMFirmware", "-VMName", lab_server[0], "-EnableSecureBoot", "Off"])
-    setautoshut = subprocess.check_output(["PowerShell", "Set-VM", "-VMName", lab_server[0], "-AutomaticStopAction", "Shutdown"])
-    setcpu = subprocess.check_output(["PowerShell", "Set-VM", "-VMName", lab_server[0], "-ProcessorCount", vm_cpu])
-    isopath = labdirectory + lab_server[0] + ".iso"
-    adddvd = subprocess.check_output(["PowerShell", "Add-VMDvdDrive", "-VMName", lab_server[0], "-Path", isopath])
-    vm_name = lab_server[0]
-    cmd = f'powershell -Command "Set-VMFirmware -VMName {vm_name} -FirstBootDevice $(Get-VMDvdDrive -VMName {vm_name})"'
-    setdvdboot = subprocess.run(cmd, shell=True)
-    startvm = subprocess.check_output(["PowerShell", "Start-VM", "-VMName", lab_server[0]])
-
-
-
+    if hypervisor == "hyperv":
+        vm_memory = "3GB"
+        vm_cpu = "4"
+        ks = create_kickstart_file(lab_kickstart_template, lab_server[0],lab_server[1], lab_server[2], lab_server[3], lab_server[4])
+        file_name = "ks.cfg"
+        with open(file_name, 'w', newline='\n') as f:
+            f.writelines(ks)
+        copy_ks_to_extracted_iso = subprocess.check_output(["PowerShell", "Copy-Item", " -Path", file_name, "-Destination", extractediso_dir])
+        build_iso_file = build_iso(extractediso_dir, lab_label, labdirectory, lab_server[0])
+        newvm = subprocess.check_output(["PowerShell", "New-VM", "-Name", lab_server[0], "-Generation", "2", "-SwitchName", vmnet])
+        vhdpath = labdirectory + lab_server[0] + "\\\\" + lab_server[0] + ".vhdx"
+        print(vhdpath)
+        newvhd = subprocess.check_output(["PowerShell", "New-VHD", "-Path", vhdpath, "-Dynamic", "-SizeBytes", "1024GB"])
+        addvhd = subprocess.check_output(["PowerShell", "ADD-VMHardDiskDrive", "-VMName", lab_server[0], "-Path", vhdpath])
+        staticmem = subprocess.check_output(["PowerShell", "Set-VM", "-VMName", lab_server[0], "-StaticMemory"])
+        setmem = subprocess.check_output(["PowerShell", "Set-VM", "-VMName", lab_server[0], "-MemoryStartupBytes", vm_memory])
+        setfw = subprocess.check_output(["PowerShell", "Set-VMFirmware", "-VMName", lab_server[0], "-EnableSecureBoot", "Off"])
+        setautoshut = subprocess.check_output(["PowerShell", "Set-VM", "-VMName", lab_server[0], "-AutomaticStopAction", "Shutdown"])
+        setcpu = subprocess.check_output(["PowerShell", "Set-VM", "-VMName", lab_server[0], "-ProcessorCount", vm_cpu])
+        isopath = labdirectory + lab_server[0] + ".iso"
+        adddvd = subprocess.check_output(["PowerShell", "Add-VMDvdDrive", "-VMName", lab_server[0], "-Path", isopath])
+        vm_name = lab_server[0]
+        cmd = f'powershell -Command "Set-VMFirmware -VMName {vm_name} -FirstBootDevice $(Get-VMDvdDrive -VMName {vm_name})"'
+        setdvdboot = subprocess.run(cmd, shell=True)
+        startvm = subprocess.check_output(["PowerShell", "Start-VM", "-VMName", lab_server[0]])
+    elif hypervisor == "vmware":
+        vm_memory = "3072"
+        vm_cpu = "4"
+        vm_name = lab_server[0]
+        ks = create_kickstart_file(lab_kickstart_template, lab_server[0], lab_server[1], lab_server[2], lab_server[3], lab_server[4])
+        file_name = "ks.cfg"
+        with open(file_name, 'w', newline='\n') as f:
+            f.writelines(ks)
+        copy_ks_to_extracted_iso = subprocess.check_output(
+            ["PowerShell", "Copy-Item", " -Path", file_name, "-Destination", extractediso_dir])
+        build_iso_file = build_iso(extractediso_dir, lab_label, labdirectory, lab_server[0])
+        vm_dir = os.path.join(labdirectory, vm_name)
+        os.makedirs(vm_dir, exist_ok=True)
+        vmx_path = os.path.join(vm_dir, f"{vm_name}.vmx")
+        vmdk_path = os.path.join(vm_dir, f"{vm_name}.vmdk")
+        iso_path = os.path.join(labdirectory, f"{vm_name}.iso")
+        subprocess.run([
+            "C:\\Program Files (x86)\\VMware\\VMware Workstation\\vmware-vdiskmanager", "-c", "-s", "1024GB",
+            "-a", "lsilogic", "-t", "0", vmdk_path
+        ], check=True)
+        vmx_config = f"""
+.encoding = "UTF-8"
+config.version = "8"
+virtualHW.version = "22"
+pciBridge0.present = "TRUE"
+pciBridge4.present = "TRUE"
+pciBridge4.virtualDev = "pcieRootPort"
+pciBridge4.functions = "8"
+pciBridge5.present = "TRUE"
+pciBridge5.virtualDev = "pcieRootPort"
+pciBridge5.functions = "8"
+pciBridge6.present = "TRUE"
+pciBridge6.virtualDev = "pcieRootPort"
+pciBridge6.functions = "8"
+pciBridge7.present = "TRUE"
+pciBridge7.virtualDev = "pcieRootPort"
+pciBridge7.functions = "8"
+vmci0.present = "TRUE"
+hpet0.present = "TRUE"
+nvram = "{vm_name}.nvram"
+virtualHW.productCompatibility = "hosted"
+powerType.powerOff = "soft"
+powerType.powerOn = "soft"
+powerType.suspend = "soft"
+powerType.reset = "soft"
+displayName = "{vm_name}"
+guestOS = "oraclelinux10-64"
+tools.syncTime = "FALSE"
+sound.autoDetect = "TRUE"
+sound.fileName = "-1"
+sound.present = "TRUE"
+numvcpus = "{vm_cpu}"
+cpuid.coresPerSocket = "1"
+memsize = "{vm_memory}"
+nvme0.present = "TRUE"
+nvme0:0.fileName = "{vm_name}.vmdk"
+nvme0:0.present = "TRUE"
+ide1:0.deviceType = "cdrom-image"
+ide1:0.fileName = "{iso_path}"
+ide1:0.present = "TRUE"
+ide1:0.startConnected = "TRUE"
+usb.present = "TRUE"
+ehci.present = "TRUE"
+ethernet0.connectionType = "nat"
+ethernet0.addressType = "generated"
+ethernet0.virtualDev = "vmxnet3"
+ethernet0.present = "TRUE"
+extendedConfigFile = "{vm_name}.vmxf"
+floppy0.present = "FALSE"
+bios.bootDelay = "5000"
+firmware = "efi"
+        """
+        with open(vmx_path, "w") as f:
+            f.write(vmx_config.strip())
+        try:
+            subprocess.run([
+                r"C:\Program Files (x86)\VMware\VMware Workstation\vmrun.exe",
+                "-T", "ws",
+                "start",
+                vmx_path
+            ], check=True)
+        except subprocess.CalledProcessError as e:
+            print("Ignoring vmrun error:", e)
