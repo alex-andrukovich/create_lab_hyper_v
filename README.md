@@ -1,1 +1,1 @@
--s hosts_file.txt -k ks_tmpl.cfg -l D:\VM_LAB\ -i D:\VM_LAB\OracleLinux-R9-U2-x86_64-dvd.iso -e D:\extracted_iso\ -n NAT
+-s just-one-lab.txt -k ks_tmpl_10_selinux_disabled-nvme.cfg -l D:\XXXXXXX\ -i D:\XXXXXX\ISO\OracleLinux-R10-U0-x86_64-dvd.iso -e D:\extracted_iso\ -n NAT -v vmware
